@@ -367,7 +367,28 @@ contactForm?.addEventListener('submit', (event) => {
   window.location.href = `mailto:yaronogen@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 });
 
+const menuButton = document.querySelector('.menu-button');
+const siteMenu = document.querySelector('#site-menu');
+
+function setMenuOpen(open) {
+  if (!menuButton || !siteMenu) return;
+  siteMenu.classList.toggle('is-open', open);
+  menuButton.setAttribute('aria-expanded', String(open));
+  menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+}
+
+menuButton?.addEventListener('click', () => {
+  setMenuOpen(menuButton.getAttribute('aria-expanded') !== 'true');
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !siteMenu?.classList.contains('is-open')) return;
+  setMenuOpen(false);
+  menuButton.focus();
+});
+
 function showPage(pageId, { updateHistory = false } = {}) {
+  setMenuOpen(false);
   const page = pageById.get(pageId) ?? pageById.get('home');
   if (!page) return;
 
