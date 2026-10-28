@@ -556,3 +556,20 @@ h1 em,h2 em{font-style:normal;color:#e5a96a;font-weight:500}
 
 /* Contact: same top spacing as the other sections on desktop */
 @media(min-width:701px){.contact-section{padding-top:clamp(68px,9vh,112px)}}
+
+/* Phones: stack the expertise rows (these selectors match the desktop column rules) */
+@media(max-width:700px){
+	.expertise-services .service-card>h3,.expertise-services .service-card>p,.expertise-services .service-card>ul,.expertise-services .service-card>figure.service-image{grid-column:1;grid-row:auto}
+	.expertise-services .service-card>.card-number{position:static;display:block;grid-column:1;grid-row:auto;margin:0 0 8px}
+	.expertise-services .service-card>h3{padding-top:0}
+	.expertise-services .service-card>figure.service-image{max-width:none;margin:4px 0 0}
+}
+
+/* Phones: show all sections in the bottom menu as two rows of four */
+@media(max-width:700px){
+	.site-sidebar{height:auto}
+	.site-sidebar .primary-nav{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:none;grid-auto-flow:row;grid-auto-columns:auto;overflow:visible;height:auto}
+	.site-sidebar .primary-nav a{min-height:44px;height:auto;padding:4px 2px;font-size:11px;letter-spacing:0}
+	.site-footer{padding-bottom:120px}
+	.page-view{min-height:calc(100vh - 190px)}
+}
