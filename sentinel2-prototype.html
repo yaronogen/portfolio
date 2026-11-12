@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Prototype: Sentinel-2 spectral visualization</title>
+    <link rel="stylesheet" href="styles.css?v=65">
+    <link rel="stylesheet" href="s2-viz.css?v=1">
+    <script src="s2-viz.js?v=1" defer></script>
+    <style>
+      body{padding:40px var(--gutter) 64px;max-width:1440px;margin:0 auto}
+      .proto-note{max-width:46em;color:var(--ink-2);font-size:15px}
+      .proto-h1{font:400 clamp(40px,4.6vw,72px)/1 var(--serif);letter-spacing:-.02em;margin:10px 0 28px}
+    </style>
+  </head>
+  <body>
+    <p class="eyebrow">Prototype · not linked from the site</p>
+    <p class="proto-note">Stages A–C. In place on the homepage this figure sits directly under the headline below. Try the stage buttons, the example pixels, clicking anywhere on the image, the arrow keys with Enter, and Compare.</p>
+    <h1 class="proto-h1">Understanding Earth through remote sensing.</h1>
+
+    <figure class="s2viz" data-s2viz data-src="assets/s2/">
+      <img class="s2viz-fallback" src="assets/s2/truecolor.webp" width="432" height="216" alt="Sentinel-2 true-colour image of the south shore of the Geiseltalsee at Braunsbedra, Germany, 28 August 2024: the lake at the top, the town in the middle and harvested fields at the bottom.">
+      <figcaption><span class="fig-no">Fig. 01</span><span class="s2viz-caption">Sentinel-2 Level-2A image of the south shore of the Geiseltalsee at Braunsbedra, Germany, 28 August 2024.</span><span class="s2viz-credit">Contains modified Copernicus Sentinel data 2024, processed by ESA · via Microsoft Planetary Computer</span></figcaption>
+    </figure>
+  </body>
+</html>
