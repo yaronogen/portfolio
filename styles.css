@@ -102,12 +102,15 @@ h1 em,h2 em{font-style:normal;color:inherit}
 /* ==========================================================================
    Home
    ========================================================================== */
-.hero{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,6fr);gap:clamp(28px,4vw,64px);align-items:end;padding-top:clamp(48px,9vh,96px);padding-bottom:40px;border-bottom:1px solid var(--ink);margin-left:var(--gutter);margin-right:var(--gutter);padding-left:0;padding-right:0;min-height:0}
+.hero{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(28px,3.5vw,48px);align-items:end;padding-top:clamp(48px,9vh,96px);padding-bottom:40px;border-bottom:1px solid var(--ink);margin-left:var(--gutter);margin-right:var(--gutter);padding-left:0;padding-right:0;min-height:0}
 .hero h1{font-size:clamp(46px,5.4vw,86px);line-height:1;letter-spacing:-.02em;margin:0 0 26px}
 .hero-intro{font-size:17.5px;line-height:1.65;color:var(--ink-2);max-width:32em;margin:0 0 30px}
 .hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px}
-.hero-plate{margin:0}
-.hero-plate .image-lightbox-trigger{padding:10px}
+.hero-copy{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);column-gap:clamp(28px,4vw,64px);align-items:end}
+.hero-copy .eyebrow,.hero-copy h1{grid-column:1}
+.hero-copy .hero-intro{grid-column:2;grid-row:2;margin-bottom:18px}
+.hero-copy .hero-actions{grid-column:2;grid-row:3}
+.hero-copy h1{grid-row:2/4;margin:0}
 .scales-intro{margin:40px var(--gutter) 0;font:500 11.5px/1.45 var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .scales{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:14px var(--gutter) 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:0;list-style:none}
 .scales li{padding:22px 22px 26px;border-left:1px solid var(--rule)}
@@ -366,7 +369,10 @@ figcaption,.fig-caption{margin-top:10px;font:13px/1.55 var(--sans);color:var(--i
   .sidebar-footer{margin-top:16px;border-top:0}
   .main-content,.site-footer{margin-left:0}
 
-  .hero{grid-template-columns:1fr;gap:32px;padding-top:36px}
+  .hero{gap:32px;padding-top:36px}
+  .hero-copy{display:block}
+  .hero-copy h1{margin-bottom:18px}
+  .hero-copy .hero-intro{margin-bottom:30px}
   .hero h1{font-size:clamp(42px,11.5vw,64px);margin-bottom:18px}
   .hero-intro{font-size:16.5px}
   .scales{grid-template-columns:1fr 1fr}

@@ -1,3 +1,4 @@
 *.bin binary
 *.webp binary
 *.woff2 binary
+*.gz binary

@@ -251,5 +251,89 @@
  },
  "example_rules": "Choose one representative pixel per surface type with fixed, stated rules.\n\n    Rules (all must hold):\n      * the 20 m Scene Classification pixel is valid (not cloud, shadow, cirrus...)\n      * the SCL class matches the surface type (vegetation 4, not vegetated 5, water 6)\n      * NDVI is in the stated range for that type\n      * the surrounding 5x5 block of 10 m pixels is spectrally uniform, so the\n        20 m bands describe the same surface (lowest summed std of the 10 m bands)\n    Built-up and bare soil are both SCL 5; they are separated here by the\n    SWIR-1/NIR ratio and blue reflectance, which is a heuristic and is stated\n    as such in scene.json.",
  "place": "South shore of the Geiseltalsee at Braunsbedra, Saxony-Anhalt, Germany",
- "attribution": "Contains modified Copernicus Sentinel data 2024, processed by ESA. Accessed via Microsoft Planetary Computer."
+ "attribution": "Contains modified Copernicus Sentinel data 2024, processed by ESA. Accessed via Microsoft Planetary Computer.",
+ "dynamic_world": {
+  "image_id": "GOOGLE/DYNAMICWORLD/V1/20240828T102021_20240828T102019_T32UPB",
+  "source_product": "Sentinel-2 L1C of the same acquisition (2024-08-28, tile 32UPB)",
+  "file": "dw.bin.gz",
+  "layout": "gzip, uint8, band-sequential [label, water, trees, grass, flooded_vegetation, crops, shrub_and_scrub, built, bare, snow_and_ice], 10 m grid of the scene",
+  "probability_scale": 250,
+  "empty_value": 255,
+  "classes": [
+   {
+    "id": 0,
+    "key": "water",
+    "name": "Water",
+    "color": "#419bdf"
+   },
+   {
+    "id": 1,
+    "key": "trees",
+    "name": "Trees",
+    "color": "#397d49"
+   },
+   {
+    "id": 2,
+    "key": "grass",
+    "name": "Grass",
+    "color": "#88b053"
+   },
+   {
+    "id": 3,
+    "key": "flooded_vegetation",
+    "name": "Flooded vegetation",
+    "color": "#7a87c6"
+   },
+   {
+    "id": 4,
+    "key": "crops",
+    "name": "Crops",
+    "color": "#e49635"
+   },
+   {
+    "id": 5,
+    "key": "shrub_and_scrub",
+    "name": "Shrub and scrub",
+    "color": "#dfc35a"
+   },
+   {
+    "id": 6,
+    "key": "built",
+    "name": "Built area",
+    "color": "#c4281b"
+   },
+   {
+    "id": 7,
+    "key": "bare",
+    "name": "Bare ground",
+    "color": "#a59b8f"
+   },
+   {
+    "id": 8,
+    "key": "snow_and_ice",
+    "name": "Snow and ice",
+    "color": "#b39fe1"
+   }
+  ],
+  "pixel_counts": {
+   "water": 23338,
+   "trees": 28182,
+   "grass": 1328,
+   "flooded_vegetation": 0,
+   "crops": 10684,
+   "shrub_and_scrub": 2738,
+   "built": 27042,
+   "bare": 0,
+   "snow_and_ice": 0
+  },
+  "empty_pixels": 0,
+  "top_probability_quartiles": [
+   0.532,
+   0.699,
+   0.742
+  ],
+  "label_rule": "label is the class with the highest probability",
+  "citation": "Brown, C.F., Brumby, S.P., Guzder-Williams, B. et al. Dynamic World, Near real-time global 10 m land use land cover mapping. Sci Data 9, 251 (2022). doi:10.1038/s41597-022-01307-4",
+  "license": "CC BY 4.0. Produced by Google and World Resources Institute."
+ }
 }

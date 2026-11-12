@@ -11,8 +11,10 @@
     <title>Dr. Yaron Ogen &mdash; Remote sensing &amp; geospatial science</title>
     <link rel="preload" href="fonts/newsreader-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="styles.css?v=65">
+    <link rel="stylesheet" href="styles.css?v=66">
+    <link rel="stylesheet" href="s2-viz.css?v=2">
     <script src="script.js?v=21" defer></script>
+    <script src="s2-viz.js?v=2" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -51,7 +53,7 @@
             <p class="hero-intro">I&rsquo;m Dr. Yaron Ogen, a remote sensing scientist. I connect laboratory, field, airborne and satellite observations to make environmental patterns easier to understand.</p>
             <div class="hero-actions"><a class="button" href="#research">Explore my research <span aria-hidden="true">&#8595;</span></a><a class="text-link" href="#contact">Discuss a collaboration</a></div>
           </div>
-          <figure class="hero-plate"><button class="image-lightbox-trigger" type="button" aria-label="Open burn severity map larger"><img src="assets/img/severity.webp" width="1600" height="1101" decoding="async" fetchpriority="high" alt="Burn severity map west of Jerusalem showing low to high dNBR classes from the Judean Hills wildfire, 15&ndash;18 August 2021."><span class="image-zoom-hint" aria-hidden="true">View larger <span>&#8599;</span></span></button><figcaption><span class="fig-no">Fig. 01</span>Burn severity west of Jerusalem &middot; Judean Hills wildfire, August 2021</figcaption></figure>
+          <figure class="s2viz hero-viz" data-s2viz data-src="assets/s2/"><img class="s2viz-fallback" src="assets/s2/truecolor.webp" width="432" height="216" decoding="async" fetchpriority="high" alt="Sentinel-2 true-colour image of the south shore of the Geiseltalsee at Braunsbedra, Germany, 28 August 2024: the lake at the top, the town in the middle and harvested fields at the bottom."><figcaption><span class="fig-no">Fig. 01</span><span class="s2viz-caption">Sentinel-2 Level-2A image of the south shore of the Geiseltalsee at Braunsbedra, Germany, 28 August 2024.</span><span class="s2viz-credit">Contains modified Copernicus Sentinel data 2024, processed by ESA &middot; via Microsoft Planetary Computer &middot; Land cover: Dynamic World V1, Google and World Resources Institute (CC BY 4.0)</span></figcaption></figure>
         </section>
         <section class="scales-block" aria-labelledby="scales-title">
           <p class="scales-intro" id="scales-title">From spectral measurements to Earth observation.</p>

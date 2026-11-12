@@ -5,6 +5,11 @@
  *   reflectance = (DN + BOA_ADD_OFFSET) / QUANTIFICATION_VALUE
  * Each band is read at its native resolution (10, 20 or 60 m).
  *
+ * Stage D adds Dynamic World land-cover predictions for the same acquisition
+ * (assets/s2/dw.bin.gz, prepared by tools/sentinel2/prepare_dynamicworld.py).
+ * They are model outputs and are always labelled as predictions, separate
+ * from the measured reflectance.
+ *
  * The intro is a single deterministic timeline: drawIntro(t) renders any
  * moment, so pause, replay, stage jumps and reduced motion all reuse it.
  */
@@ -18,9 +23,15 @@
       caption: 'Sentinel-2 is a passive optical satellite. Sunlight reaches the ground, each surface reflects part of it, and the MultiSpectral Instrument (MSI) records the reflected light in discrete bands. Line widths show the measured near-infrared (B8) reflectance of four pixels from this scene.' },
     { name: 'Acquisition', start: 7000, end: 15000, still: 10600,
       caption: 'The MSI is a push-broom scanner: the image is built line by line as the satellite moves along its orbit. The view zooms into a 4.3 × 2.2 km window and switches to Level-2A surface reflectance, which is corrected for the atmosphere.' },
-    { name: 'Spectra', start: 15000, end: 16600, still: 16600,
+    { name: 'Spectra', start: 15000, end: 19000, still: 16600,
       caption: 'Select any pixel, or one of the examples, to see its measured surface reflectance in the 12 Level-2A bands.' },
+    { name: 'Land cover', start: 19000, end: 22000, still: 22000,
+      caption: 'Dynamic World, a neural-network model by Google and the World Resources Institute, predicts land cover for every 10 m pixel of this acquisition. The map is a prediction, not a measurement: each pixel has a probability for nine classes, and the Confidence view shows where the model is less certain.' },
   ];
+  const WIPE = [19400, 21400];
+  const VIEWS = { image: 'Image', classes: 'Land cover', confidence: 'Confidence' };
+  // Confidence ramp (top-class probability): light = less certain, dark = more certain.
+  const CONF_LO = 0.3, CONF_HI = 0.9, CONF_A = [241, 233, 220], CONF_B = [31, 45, 56];
   const T_END = STAGES[STAGES.length - 1].end;
 
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -89,8 +100,11 @@
     tableWrap.append(el('summary', {}, 'Show values as a table'));
     const table = el('table');
     tableWrap.append(table);
-    panel.append(chart, legend, tableWrap, live);
-    stageCol.append(stageBox, pixelInfo);
+    const kicker = el('p', { class: 's2viz-kicker' });
+    kicker.innerHTML = '<b>Measured</b> · Level-2A surface reflectance';
+    panel.append(kicker, chart, legend, tableWrap, live);
+    const classKey = el('div', { class: 's2viz-classkey', hidden: '' });
+    stageCol.append(stageBox, classKey, pixelInfo);
     body.append(stageCol, panel);
 
     const controls = el('div', { class: 's2viz-controls' });
@@ -113,7 +127,14 @@
     const pinBtn = el('button', { type: 'button', class: 's2viz-pin', 'aria-pressed': 'false' }, 'Compare');
     const transport = el('div', { class: 's2viz-transport' });
     transport.append(playBtn, replayBtn);
-    controls.append(steps, transport, examples, pinBtn);
+    const views = el('div', { class: 's2viz-views', role: 'group', 'aria-label': 'Map view' });
+    const viewButtons = {};
+    for (const [key, label] of Object.entries(VIEWS)) {
+      const b = el('button', { type: 'button', 'data-view': key, 'aria-pressed': String(key === 'image') }, label);
+      viewButtons[key] = b;
+      views.append(b);
+    }
+    controls.append(steps, transport, views, examples, pinBtn);
 
     fallback?.replaceWith(body);
     figure.insertBefore(controls, figure.querySelector('figcaption'));
@@ -121,6 +142,8 @@
 
     /* ---------- State ---------- */
     let meta, imgTrue, imgCtx, bins = null;
+    let dw = null, dwLayers = null; // Dynamic World planes and rendered class / confidence canvases
+    let view = 'image', keyShown = null, autoPaused = false;
     let t = 0, playing = false, lastFrame = 0, raf = 0;
     let selected = null, pinned = null, cursor = null;
     let shown = null; // currently drawn spectrum values (for tweening)
@@ -164,6 +187,48 @@
     }
     function exampleSpectrum(key) {
       return meta.examples[key].reflectance;
+    }
+    function predictionAt(x, y) {
+      if (!dw) return null;
+      const n = W() * H(), i = y * W() + x;
+      if (dw[i] === meta.dynamic_world.empty_value) return null;
+      const s = meta.dynamic_world.probability_scale;
+      const probs = meta.dynamic_world.classes.map((c) => ({ ...c, p: dw[(c.id + 1) * n + i] / s }));
+      return { label: dw[i], probs, ranked: [...probs].sort((a, b) => b.p - a.p) };
+    }
+    function buildLayers() {
+      const w = W(), h = H(), n = w * h;
+      const make = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+      const cls = make(), conf = make();
+      const ci = cls.getContext('2d').createImageData(w, h), fi = conf.getContext('2d').createImageData(w, h);
+      const rgb = meta.dynamic_world.classes.map((c) => [1, 3, 5].map((k) => parseInt(c.color.slice(k, k + 2), 16)));
+      const s = meta.dynamic_world.probability_scale, empty = meta.dynamic_world.empty_value;
+      for (let i = 0; i < n; i++) {
+        const o = i * 4, lab = dw[i];
+        if (lab === empty) continue; // stays transparent: the image shows through
+        const [r, g, b] = rgb[lab];
+        ci.data[o] = r; ci.data[o + 1] = g; ci.data[o + 2] = b; ci.data[o + 3] = 255;
+        const q = clamp((dw[(lab + 1) * n + i] / s - CONF_LO) / (CONF_HI - CONF_LO));
+        for (let k = 0; k < 3; k++) fi.data[o + k] = Math.round(lerp(CONF_A[k], CONF_B[k], q));
+        fi.data[o + 3] = 255;
+      }
+      cls.getContext('2d').putImageData(ci, 0, 0);
+      conf.getContext('2d').putImageData(fi, 0, 0);
+      return { classes: cls, confidence: conf };
+    }
+    async function loadDynamicWorld() {
+      const info = meta.dynamic_world;
+      if (!info) throw new Error('no Dynamic World data in scene.json');
+      const res = await fetch(base + info.file);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      let bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) { // gzip (unless the server already decoded it)
+        if (!('DecompressionStream' in window)) throw new Error('DecompressionStream not supported');
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+      }
+      if (bytes.length !== (info.classes.length + 1) * W() * H()) throw new Error('unexpected Dynamic World size');
+      return bytes;
     }
     function utm(x, y) {
       return [meta.bounds[0] + (x + 0.5) * 10, meta.bounds[3] - (y + 0.5) * 10];
@@ -401,8 +466,35 @@
       ctx.strokeRect(x - pad, y - pad, s + pad * 2, s + pad * 2);
       ctx.restore();
     }
+    // The view actually on screen: during the timeline it follows the stages.
+    function effectiveView() {
+      if (t >= T_END) return view;
+      return t >= STAGES[3].start ? 'classes' : 'image';
+    }
+    function sourceFor(v) {
+      return v !== 'image' && dwLayers ? dwLayers[v] : imgTrue;
+    }
     function drawFinal() {
       drawTrueColour();
+      const v = effectiveView();
+      const p = t >= T_END ? 1 : ease(seg(t, WIPE[0], WIPE[1]));
+      if (v !== 'image' && dwLayers && p > 0) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, 0, cw * p, ch); ctx.clip();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(dwLayers[v], 0, 0, cw, ch);
+        ctx.restore();
+        if (p < 1) {
+          ctx.save(); ctx.strokeStyle = C.paper; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(cw * p, 0); ctx.lineTo(cw * p, ch); ctx.stroke(); ctx.restore();
+        }
+        if (t < T_END && t > WIPE[0]) {
+          ctx.save(); ctx.globalAlpha = 1 - seg(t, 21400, 21900);
+          label('DYNAMIC WORLD · PREDICTED LAND COVER · 10 M', 12, ch - 14);
+          ctx.restore();
+        }
+      }
+      updateKey(dwLayers && p > 0 ? v : 'image');
       if (pinned) drawMarker(pinned, C.accent, true);
       if (selected) drawMarker(selected, C.ink, false);
       if (cursor && (!selected || cursor.x !== selected.x || cursor.y !== selected.y)) {
@@ -419,11 +511,12 @@
       if (!p || openP <= 0) { loupe.style.opacity = '0'; loupeKey.style.opacity = '0'; return; }
       loupe.style.opacity = String(openP); loupeKey.style.opacity = String(openP);
       const n = 13, cell = size / n;
-      const iw = imgTrue.naturalWidth / W();
+      const src = t >= T_END ? sourceFor(view) : imgTrue;
+      const iw = (src.naturalWidth || src.width) / W();
       const sx = (p.x - 6) * iw, sy = (p.y - 6) * iw;
       lctx.imageSmoothingEnabled = false;
       lctx.fillStyle = C.paper; lctx.fillRect(0, 0, size, size);
-      lctx.drawImage(imgTrue, sx, sy, n * iw, n * iw, 0, 0, size, size);
+      lctx.drawImage(src, sx, sy, n * iw, n * iw, 0, 0, size, size);
       lctx.strokeStyle = 'rgba(255,255,255,.35)'; lctx.lineWidth = 1;
       for (let i = 1; i < n; i++) {
         lctx.beginPath(); lctx.moveTo(i * cell, 0); lctx.lineTo(i * cell, size); lctx.stroke();
@@ -439,6 +532,30 @@
       lctx.strokeRect(ox(x20), oy(y20), 2 * cell, 2 * cell);
       lctx.setLineDash([]); lctx.strokeStyle = C.accent; lctx.lineWidth = 2.5 * dpr;
       lctx.strokeRect(ox(p.x), oy(p.y), cell, cell);
+    }
+
+    /* ---------- Land-cover key ---------- */
+    function updateKey(v) {
+      if (v === keyShown) return;
+      keyShown = v;
+      if (v === 'image' || !meta.dynamic_world) { classKey.hidden = true; classKey.replaceChildren(); return; }
+      const info = meta.dynamic_world;
+      const total = Object.values(info.pixel_counts).reduce((a, b) => a + b, 0) || 1;
+      let html = '<p class="s2viz-kicker"><b>Predicted</b> · Dynamic World land cover, ' +
+        (v === 'classes' ? 'most likely class per pixel' : 'probability of the most likely class') + '</p>';
+      if (v === 'classes') {
+        const present = info.classes.filter((c) => info.pixel_counts[c.key] > 0);
+        const absent = info.classes.filter((c) => !info.pixel_counts[c.key]);
+        html += '<ul class="s2viz-classes">' + present.map((c) =>
+          `<li><i style="background:${c.color}"></i>${c.name} <span>${Math.round((100 * info.pixel_counts[c.key]) / total)}%</span></li>`).join('') + '</ul>';
+        if (absent.length) html += `<p class="s2viz-keynote">Not predicted in this window: ${absent.map((c) => c.name.toLowerCase()).join(', ')}.</p>`;
+      } else {
+        const a = `rgb(${CONF_A.join(',')})`, b = `rgb(${CONF_B.join(',')})`;
+        html += `<div class="s2viz-ramp"><span>≤ ${CONF_LO} less certain</span><i style="background:linear-gradient(90deg,${a},${b})"></i><span>${CONF_HI} more certain</span></div>` +
+          `<p class="s2viz-keynote">Median ${info.top_probability_quartiles[1].toFixed(2)} in this window. These are the model’s own probabilities, not a measured accuracy.</p>`;
+      }
+      classKey.innerHTML = html;
+      classKey.hidden = false;
     }
 
     /* ---------- Chart ---------- */
@@ -532,9 +649,20 @@
       if (meta.scl_invalid_classes.includes(scl)) notes.push('This pixel is flagged by the scene classification (for example cloud or shadow); its values are not a reliable surface measurement.');
       if (mixedness(p.x, p.y) > 0.35) notes.push('Mixed surroundings: the 20 m and 60 m bands average over neighbouring surfaces that differ from this 10 m pixel.');
       if (p.example) notes.push('Example chosen by fixed rules in the data-preparation script (scene class, NDVI and a uniform 50 × 50 m neighbourhood).');
+      const pred = predictionAt(p.x, p.y);
+      if (pred && pred.ranked[0].p < 0.5) notes.push('The model is uncertain here: no land-cover class reaches a probability of 0.5.');
       if (notes.length) lines.push(`<p class="s2viz-note">${notes.join(' ')}</p>`);
-      pixelInfo.innerHTML = lines.join('');
-      return { name, scl };
+      let predHtml = '';
+      if (pred) {
+        const top = pred.ranked[0];
+        const rest = pred.ranked.slice(1).filter((c) => c.p >= 0.05).map((c) => `${c.name} ${c.p.toFixed(2)}`).join(' · ');
+        predHtml = `<div class="s2viz-pred"><p class="s2viz-kicker"><b>Predicted</b> · Dynamic World</p>` +
+          `<p class="s2viz-pred-top"><i style="background:${top.color}"></i>${top.name} <b>${top.p.toFixed(2)}</b></p>` +
+          `<p class="s2viz-pred-bar" aria-hidden="true">${pred.probs.filter((c) => c.p > 0).map((c) => `<span style="width:${(c.p * 100).toFixed(1)}%;background:${c.color}" title="${c.name} ${c.p.toFixed(2)}"></span>`).join('')}</p>` +
+          (rest ? `<p class="s2viz-pred-rest">Then ${rest}</p>` : '') + '</div>';
+      }
+      pixelInfo.innerHTML = `<div class="s2viz-obs">${lines.join('')}</div>${predHtml}`;
+      return { name, scl, pred };
     }
     function fillTable() {
       const head = `<thead><tr><th scope="col">Band</th><th scope="col">Centre (nm)</th><th scope="col">Native res.</th><th scope="col">${selected ? 'Selected' : ''}</th>${pinned ? '<th scope="col">Pinned</th>' : ''}</tr></thead>`;
@@ -552,12 +680,13 @@
       selected = { ...p, values };
       cursor = { x: p.x, y: p.y };
       for (const [k, b] of Object.entries(exampleButtons)) b.setAttribute('aria-pressed', String(k === p.example));
-      const { name, scl } = bins ? describe(selected) : { name: EXAMPLE_LABELS[p.example], scl: meta.examples[p.example].scl };
+      const { name, scl, pred } = bins ? describe(selected) : { name: EXAMPLE_LABELS[p.example], scl: meta.examples[p.example].scl };
       if (!bins) pixelInfo.innerHTML = `<p class="s2viz-pixel-name">${name}</p>`;
       chartTitle.textContent = `Surface reflectance spectrum of ${name}, 12 Sentinel-2 Level-2A bands from ${meta.bands.B01.center_nm} to ${meta.bands.B12.center_nm} nm.`;
       startTween(values);
       fillTable();
-      if (announce) live.textContent = `${name} selected. Scene classification ${SCL_NAMES[scl]}. Red ${fmt(values.B04)}, near infrared ${fmt(values.B08)}, shortwave infrared ${fmt(values.B11)}.`;
+      if (announce) live.textContent = `${name} selected. Scene classification ${SCL_NAMES[scl]}. Red ${fmt(values.B04)}, near infrared ${fmt(values.B08)}, shortwave infrared ${fmt(values.B11)}.` +
+        (pred ? ` Dynamic World predicts ${pred.ranked[0].name}, probability ${pred.ranked[0].p.toFixed(2)}.` : '');
       if (t >= T_END) { drawFinal(); drawLoupe(selected); }
     }
     function startTween(to) {
@@ -586,18 +715,21 @@
       if (t >= 15000) {
         drawFinal();
         drawLoupe(selected, ease(seg(t, 15000, 15800)));
-      } else drawLoupe(null);
+      } else { drawLoupe(null); updateKey('image'); }
     }
     function setStage() {
       const i = STAGES.findIndex((s) => t < s.end);
-      const idx = i === -1 ? STAGES.length - 1 : i;
+      const idx = t >= T_END ? (view === 'image' ? 2 : 3) : (i === -1 ? STAGES.length - 1 : i);
+      const v = effectiveView();
+      for (const [k, b] of Object.entries(viewButtons)) b.setAttribute('aria-pressed', String(k === v));
       stepButtons.forEach((b, k) => b.setAttribute('aria-current', k === idx ? 'step' : 'false'));
       if (caption && caption.dataset.stage !== String(idx)) { caption.textContent = STAGES[idx].caption; caption.dataset.stage = String(idx); }
     }
     function frame(now) {
       if (!playing) return;
-      t = Math.min(T_END, t + (now - lastFrame));
+      t = Math.min(T_END, t + Math.min(100, now - lastFrame)); // no jump after a background tab
       lastFrame = now;
+      if (t >= T_END) view = dwLayers ? 'classes' : 'image';
       if (t >= 15000 && !selected) select({ ...meta.examples.vegetation, example: 'vegetation' }, { announce: false });
       render(); setStage();
       if (t >= T_END) { setPlaying(false); return; }
@@ -615,16 +747,31 @@
       if (t >= 15000 && !selected) select({ ...meta.examples.vegetation, example: 'vegetation' }, { announce: false });
       render(); setStage(); setPlaying(play);
     }
-    function finishIntro() { if (t < T_END) jump(T_END, false); }
+    // Skip to the interactive state, keeping the view the timeline was showing.
+    function finishIntro() {
+      if (t >= T_END) return;
+      view = dwLayers && t >= STAGES[3].start ? 'classes' : 'image';
+      jump(T_END, false);
+    }
+    function setView(v) {
+      finishIntro();
+      view = v === 'image' || dwLayers ? v : 'image';
+      render(); setStage();
+      if (selected) drawLoupe(selected);
+      live.textContent = `${VIEWS[view]} view.` + (view === 'image' ? '' : ' Dynamic World prediction, not a measurement.');
+    }
 
     /* ---------- Events ---------- */
-    playBtn.addEventListener('click', () => setPlaying(!playing));
-    replayBtn.addEventListener('click', () => { selected = null; shown = null; pinned = null; pinBtn.setAttribute('aria-pressed', 'false'); updateChart(); jump(0, !reducedMotion.matches); });
+    playBtn.addEventListener('click', () => { autoPaused = false; setPlaying(!playing); });
+    replayBtn.addEventListener('click', () => { view = 'image'; selected = null; shown = null; pinned = null; pinBtn.setAttribute('aria-pressed', 'false'); updateChart(); jump(0, !reducedMotion.matches); });
     stepButtons.forEach((b, i) => b.addEventListener('click', () => {
       const s = STAGES[i];
-      jump(reducedMotion.matches ? s.still : s.start, !reducedMotion.matches && i < STAGES.length - 1);
-      if (i === STAGES.length - 1) finishIntro();
+      if (i === 2) { view = 'image'; jump(T_END, false); return; } // spectra: the interactive state
+      if (i === 3 && (reducedMotion.matches || !dwLayers)) { view = dwLayers ? 'classes' : 'image'; jump(T_END, false); return; }
+      view = 'image';
+      jump(reducedMotion.matches ? s.still : s.start, !reducedMotion.matches);
     }));
+    for (const [key, b] of Object.entries(viewButtons)) b.addEventListener('click', () => setView(key));
     for (const [key, b] of Object.entries(exampleButtons)) b.addEventListener('click', () => {
       finishIntro();
       select({ ...meta.examples[key], example: key });
@@ -653,6 +800,12 @@
       }
     });
     new ResizeObserver(() => resize()).observe(stageBox);
+    // Pause while the figure is off screen (or the Home view is hidden); resume when it returns.
+    if ('IntersectionObserver' in window) new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (!visible && playing) { autoPaused = true; setPlaying(false); }
+      else if (visible && autoPaused) { autoPaused = false; setPlaying(true); }
+    }).observe(figure);
     reducedMotion.addEventListener?.('change', () => { if (reducedMotion.matches) finishIntro(); });
 
     /* ---------- Load ---------- */
@@ -672,7 +825,17 @@
       const [b10, b20, b60, scl] = await Promise.all([load(meta.files['10']), load(meta.files['20']), load(meta.files['60']),
         fetch(base + meta.files.scl).then((r) => r.arrayBuffer()).then((a) => new Uint8Array(a))]);
       bins = { 10: b10, 20: b20, 60: b60, scl };
+      try {
+        dw = await loadDynamicWorld();
+        dwLayers = buildLayers();
+      } catch (err) {
+        // The measured data still works without the prediction layer.
+        console.warn('Dynamic World layer unavailable', err);
+        dw = null; dwLayers = null; view = 'image';
+        views.remove(); stepButtons[3].remove();
+      }
       if (selected) describe(selected);
+      render(); setStage();
       figure.classList.add('has-data');
     })().catch((err) => {
       console.error('Sentinel-2 visualization failed to load', err);
