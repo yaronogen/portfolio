@@ -63,6 +63,9 @@
 
   function init(figure) {
     const base = figure.dataset.src || 'assets/s2/';
+    // Data version: change data-version on the figure whenever assets/s2/ is regenerated, so browsers refetch.
+    const v = figure.dataset.version ? `?v=${encodeURIComponent(figure.dataset.version)}` : '';
+    const url = (f) => base + f + v;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const css = getComputedStyle(document.documentElement);
     const color = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
@@ -219,7 +222,7 @@
     async function loadDynamicWorld() {
       const info = meta.dynamic_world;
       if (!info) throw new Error('no Dynamic World data in scene.json');
-      const res = await fetch(base + info.file);
+      const res = await fetch(url(info.file));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       let bytes = new Uint8Array(await res.arrayBuffer());
       if (bytes[0] === 0x1f && bytes[1] === 0x8b) { // gzip (unless the server already decoded it)
@@ -810,8 +813,8 @@
 
     /* ---------- Load ---------- */
     (async () => {
-      meta = await fetch(`${base}scene.json`).then((r) => r.json());
-      [imgTrue, imgCtx] = await Promise.all([loadImage(`${base}truecolor.webp`), loadImage(`${base}context.webp`)]);
+      meta = await fetch(url('scene.json')).then((r) => r.json());
+      [imgTrue, imgCtx] = await Promise.all([loadImage(url('truecolor.webp')), loadImage(url('context.webp'))]);
       await document.fonts?.ready;
       drawAxes();
       resize();
@@ -821,9 +824,9 @@
       if (frozen > 0) jump(Math.min(frozen, T_END), false);
       else if (reducedMotion.matches) jump(T_END, false);
       else jump(0, true);
-      const load = async (f) => new Uint16Array(await fetch(base + f).then((r) => r.arrayBuffer()));
+      const load = async (f) => new Uint16Array(await fetch(url(f)).then((r) => r.arrayBuffer()));
       const [b10, b20, b60, scl] = await Promise.all([load(meta.files['10']), load(meta.files['20']), load(meta.files['60']),
-        fetch(base + meta.files.scl).then((r) => r.arrayBuffer()).then((a) => new Uint8Array(a))]);
+        fetch(url(meta.files.scl)).then((r) => r.arrayBuffer()).then((a) => new Uint8Array(a))]);
       bins = { 10: b10, 20: b20, 60: b60, scl };
       try {
         dw = await loadDynamicWorld();
