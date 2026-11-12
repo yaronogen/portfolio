@@ -32,7 +32,7 @@
   --sans:"IBM Plex Sans",system-ui,"Segoe UI",Arial,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
 
-  --side:232px;
+  --side:260px;
   --gutter:clamp(20px,5vw,72px);
   --measure:38em;
 }
@@ -80,7 +80,10 @@ h1 em,h2 em{font-style:normal;color:inherit}
 .wordmark-photo-button{flex:none;padding:0;margin:0;border:0;background:none;cursor:zoom-in;line-height:0}
 .wordmark-mark{display:block;overflow:hidden}
 .wordmark-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 14%;filter:grayscale(1)}
-.sidebar-wordmark .wordmark-mark{width:46px;height:60px}
+.sidebar-wordmark .wordmark-mark{width:42px;height:56px}
+.wordmark-name{display:block;white-space:nowrap}
+.sidebar-wordmark .wordmark-sub{font-size:12px}
+.sidebar-wordmark .wordmark-sub>span{display:block;white-space:nowrap}
 .wordmark-text{display:block;text-decoration:none;font:500 19px/1.15 var(--serif);color:var(--ink)}
 .wordmark-sub{display:block;margin-top:4px;font:12px/1.45 var(--sans);color:var(--muted)}
 .primary-nav{display:flex;flex-direction:column;margin-top:40px}
