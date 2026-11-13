@@ -137,11 +137,23 @@
       viewButtons[key] = b;
       views.append(b);
     }
-    controls.append(steps, transport, views, examples, pinBtn);
-
     fallback?.replaceWith(body);
-    figure.insertBefore(controls, figure.querySelector('figcaption'));
     figure.classList.add('is-ready');
+
+    // Single-column layouts (tablets, phones): keep the controls directly under the map
+    // instead of below the spectrum chart. Phones also get a compact control order.
+    // The DOM is moved (not just restyled) so keyboard focus order matches what is shown.
+    const stackedMQ = window.matchMedia('(max-width: 1180px)');
+    const compactMQ = window.matchMedia('(max-width: 560px)');
+    function placeControls() {
+      if (compactMQ.matches) controls.append(steps, views, examples, transport, pinBtn);
+      else controls.append(steps, transport, views, examples, pinBtn);
+      if (stackedMQ.matches) stageCol.after(controls);
+      else figure.insertBefore(controls, figure.querySelector('figcaption'));
+    }
+    placeControls();
+    stackedMQ.addEventListener('change', placeControls);
+    compactMQ.addEventListener('change', placeControls);
 
     /* ---------- State ---------- */
     let meta, imgTrue, imgCtx, bins = null;
@@ -294,6 +306,9 @@
       ctx.save();
       ctx.globalAlpha = alpha;
       const groundY = h * 0.78;
+      // Phones: smaller type, wider ground strip and repositioned labels so nothing collides.
+      const compact = w < 520;
+      const FONT = `500 ${compact ? 8.5 : 10}px ${MONO}`;
       const fadeIn = ease(seg(tt, 0, 800));
       ctx.globalAlpha = alpha * fadeIn;
 
@@ -301,17 +316,17 @@
       const cx = w * 0.5, R = w * 1.25, cy = h * 0.2 + R;
       ctx.strokeStyle = C.rule; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
       ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI * 1.36, Math.PI * 1.64); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = C.muted; ctx.font = `500 10px ${MONO}`; ctx.textAlign = 'right';
-      ctx.fillText('SUN-SYNCHRONOUS ORBIT · 786 KM', w * 0.97, h * 0.1);
+      ctx.fillStyle = C.muted; ctx.font = FONT; ctx.textAlign = 'right';
+      ctx.fillText(compact ? 'ORBIT · 786 KM' : 'SUN-SYNCHRONOUS ORBIT · 786 KM', w * 0.97, h * 0.1);
 
       // Ground cross-section: four surfaces from the scene.
-      const segW = w * 0.68 / 4, gx0 = w * 0.3;
+      const segW = w * (compact ? 0.72 : 0.68) / 4, gx0 = w * (compact ? 0.26 : 0.3);
       SURFACES.forEach((key, i) => {
         const x = gx0 + i * segW;
         ctx.fillStyle = surfaceColour(key);
         ctx.fillRect(x, groundY, segW - 6, h * 0.07);
-        ctx.fillStyle = C.ink2; ctx.font = `500 10px ${MONO}`; ctx.textAlign = 'center';
-        ctx.fillText(EXAMPLE_LABELS[key].toUpperCase(), x + (segW - 6) / 2, groundY + h * 0.07 + 15);
+        ctx.fillStyle = C.ink2; ctx.font = FONT; ctx.textAlign = 'center';
+        ctx.fillText(EXAMPLE_LABELS[key].toUpperCase(), x + (segW - 6) / 2, groundY + h * 0.07 + (compact ? 12 : 15));
       });
       ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(w * 0.02, groundY); ctx.lineTo(w * 0.98, groundY); ctx.stroke();
@@ -324,15 +339,19 @@
         const a = (k / 8) * Math.PI * 2;
         ctx.beginPath(); ctx.moveTo(sx + Math.cos(a) * 17, sy + Math.sin(a) * 17); ctx.lineTo(sx + Math.cos(a) * 23, sy + Math.sin(a) * 23); ctx.stroke();
       }
-      ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.fillText('SUNLIGHT', sx, sy + 40);
+      ctx.fillStyle = C.muted; ctx.textAlign = compact ? 'left' : 'center'; ctx.font = FONT;
+      if (compact) ctx.fillText('SUNLIGHT', sx - 13, sy + 36);
+      else ctx.fillText('SUNLIGHT', sx, sy + 40);
 
       // Satellite position along the orbit.
       const pSat = ease(seg(tt, 300, 6800));
       const ang = lerp(Math.PI * 1.44, Math.PI * 1.60, pSat);
       const satX = cx + Math.cos(ang) * R, satY = cy + Math.sin(ang) * R;
       satellite(satX, satY, Math.max(0.8, w / 700), ang + Math.PI / 2);
-      ctx.fillStyle = C.ink2; ctx.textAlign = 'left'; ctx.font = `500 10px ${MONO}`;
-      ctx.fillText('SENTINEL-2 · MSI', satX + 18, satY - 22);
+      ctx.fillStyle = C.ink2; ctx.font = FONT;
+      if (compact) { ctx.textAlign = 'right'; ctx.fillText('SENTINEL-2 · MSI', satX - 16, satY - 4); }
+      else if (satX + 18 + ctx.measureText('SENTINEL-2 · MSI').width > w - 6) { ctx.textAlign = 'right'; ctx.fillText('SENTINEL-2 · MSI', satX - 18, satY - 22); }
+      else { ctx.textAlign = 'left'; ctx.fillText('SENTINEL-2 · MSI', satX + 18, satY - 22); }
 
       // Incoming sunlight (thin, identical for all surfaces).
       const pIn = ease(seg(tt, 1000, 2600));
@@ -353,8 +372,10 @@
           ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(lerp(tx, satX, pOut), lerp(ty, satY + 16, pOut)); ctx.stroke();
           if (pOut > 0.98) {
             ctx.globalAlpha = alpha;
-            ctx.fillStyle = C.accent; ctx.font = `500 10px ${MONO}`; ctx.textAlign = 'center';
-            ctx.fillText(`B8 ${b8.toFixed(2)}`, tx, ty - 8);
+            ctx.fillStyle = C.accent; ctx.font = FONT;
+            // On phones the value sits beside the beam's foot instead of on top of it.
+            if (compact) { ctx.textAlign = 'right'; ctx.fillText(`B8 ${b8.toFixed(2)}`, tx - 5, ty - 4); }
+            else { ctx.textAlign = 'center'; ctx.fillText(`B8 ${b8.toFixed(2)}`, tx, ty - 8); }
           }
         });
         ctx.globalAlpha = alpha;
@@ -363,7 +384,7 @@
       // Spectral comb: the 12 Level-2A bands at their true centre and width.
       const pComb = ease(seg(tt, 4400, 6200));
       if (pComb > 0) {
-        const bx = w * 0.02, by = h * 0.5, bw = w * 0.2, bh = h * 0.12;
+        const bx = w * 0.02, by = h * (compact ? 0.56 : 0.5), bw = w * (compact ? 0.15 : 0.2), bh = h * 0.12;
         const xs = (nm) => bx + ((nm - 400) / (2300 - 400)) * bw;
         ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(bx, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.stroke();
@@ -374,10 +395,10 @@
           const x0 = xs(info.center_nm - info.width_nm / 2), x1 = xs(info.center_nm + info.width_nm / 2);
           ctx.fillRect(x0, by + bh - bh * p, Math.max(1.5, x1 - x0), bh * p);
         });
-        ctx.fillStyle = C.muted; ctx.font = `500 9px ${MONO}`; ctx.textAlign = 'left';
-        ctx.fillText('400', bx, by + bh + 12); ctx.textAlign = 'right'; ctx.fillText('2300 nm', bx + bw, by + bh + 12);
+        ctx.fillStyle = C.muted; ctx.font = `500 ${compact ? 8 : 9}px ${MONO}`; ctx.textAlign = 'left';
+        ctx.fillText('400', bx, by + bh + 12); ctx.textAlign = 'right'; ctx.fillText(compact ? '2300' : '2300 nm', bx + bw, by + bh + 12);
         ctx.textAlign = 'left'; ctx.fillStyle = C.ink2;
-        ctx.fillText('12 LEVEL-2A BANDS', bx, by - 6);
+        ctx.fillText(compact ? '12 BANDS (nm)' : '12 LEVEL-2A BANDS', bx, by - 6);
       }
       ctx.restore();
     }
